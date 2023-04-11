@@ -4,7 +4,8 @@ from typing import Union
 from fastapi import FastAPI, Request
 
 import datetime
-
+from dotenv import load_dotenv
+load_dotenv()
 import gpt
 
 app = FastAPI()
@@ -13,6 +14,21 @@ answers = dict()
 CUT_WORD = ['Алиса', 'алиса']
 
 users_state = dict()
+
+@app.post("/post")
+async def post(request: Request):
+    request = await request.json()
+    response = {
+        'session': request['session'],
+        'version': request['version'],
+        'response': {
+            'end_session': False
+        }
+    }
+    ## Заполняем необходимую информацию
+    await handle_dialog(response, request)
+    print(response)
+    return response
 
 async def handle_dialog(res,req):
     print('start handle:', datetime.datetime.now(tz=None))
@@ -77,5 +93,3 @@ async def ask(request, messages):
     answers[request] = reply
     print('get response from gpt:', datetime.datetime.now(tz=None))
     return reply
-
-

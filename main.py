@@ -34,7 +34,7 @@ async def handle_dialog(res,req):
     print('start handle:', datetime.datetime.now(tz=None))
     print(req)
     session_id = req['session'].get('session_id')
-    print('userid', session_id)
+    print('session_id', session_id)
     if session_id and not session_id in users_state:
         users_state[session_id] = {
             'messages': [],
@@ -65,21 +65,22 @@ async def handle_dialog(res,req):
                 del answers[request]
             else:
                 print('no response')
-                reply = 'Не успел получить ответ. Спросите позже'
+                reply = 'Your request sent to chat GPT, please wait for 30 seconds and ask again! '
                 res['response']['tts'] = reply + '<speaker audio="alice-sounds-things-door-2.opus">'
                 session_state['message'] = request
         else:
             old_request = session_state['message']
             if old_request not in answers:
-                reply = 'Ответ пока не готов, спросите позже'
+                reply = 'Answer is not ready yet, please wait. '
                 res['response']['tts'] = reply + '<speaker audio="alice-sounds-things-door-2.opus">'
             else:
                 answer = answers[old_request]
                 del answers[old_request]
                 del session_state['message']
-                reply = f'Отвечаю на предыдущий вопрос "{old_request}"\n {answer}'
+                reply = f'GPT says to you: {answer}'
+                res['response']['tts'] = answer
     else:
-        reply = 'Я умный chat бот. Спроси что-нибудь'
+        reply = 'I am clever chat bot for Learning English. Speak to me please!'
         ## Если это первое сообщение — представляемся
     res['response']['text'] = reply
     print('end handle:', datetime.datetime.now(tz=None))
@@ -89,7 +90,7 @@ async def ask(request, messages):
         reply = await gpt.aquery(request, messages)
     except Exception as e:
         traceback.print_exc()
-        reply = 'Не удалось получить ответ'
+        reply = 'Error during asking gpt'
     answers[request] = reply
     print('get response from gpt:', datetime.datetime.now(tz=None))
     return reply

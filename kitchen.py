@@ -27,7 +27,7 @@ processed_files=[]
 new_files = []
 mp3files=[]
 
-def step1():
+def step1_searchmp4():
     # Open existing.txt file and form an array of processed files
     with open('processed.txt', 'r') as f:
         processed_files = f.read().splitlines()
@@ -48,53 +48,51 @@ def step1():
                 new_files.append(fullpath)
     print("step1 complete.new mp4 files count="+str(new_files.count))
 
-def step2():
-    print("going to save as mp3 "+str(new_files.count))
-    for mp4file in new_files:
-        videoclip = VideoFileClip(mp4file)
-        audioclip = videoclip.audio
-        now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        rand_int = random.randint(0, 9999)        
-        filename = f"audio_{now}_{rand_int}.mp3"
-        fullpath = os.path.join(folder_mp3,filename)
-        audioclip.write_audiofile(fullpath)
-        videoclip.close()
-        audioclip.close()
-        mp3files.append(fullpath)
+def step2_getmp3audio(mp4file)->str:
+    print("going to save as mp3 "+str(mp4file))    
+    videoclip = VideoFileClip(mp4file)
+    audioclip = videoclip.audio
+    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    rand_int = random.randint(0, 9999)        
+    filename = f"audio_{now}_{rand_int}.mp3"
+    fullpath = os.path.join(folder_mp3,filename)
+    audioclip.write_audiofile(fullpath)
+    videoclip.close()
+    audioclip.close()
+    mp3files.append(fullpath)
+    print("mp3 saved "+fullpath)
+    return fullpath
 
-def step3():
-    print("going to TTS "+str(mp3files.count))
-    # Replace with your API key and audio file path
+def step3_tts(mp3path)->str:
+    print("going to TTS "+str(mp3path))
+        # Replace with your API key and audio file path
     API_KEY = 'your_yandex_api_key'
-    for path in mp3files:
+    
         # Read the audio file as binary data
-        with open(path, 'rb') as f:
-            audio_data = f.read()
+    with open(mp3path, 'rb') as f:
+        audio_data = f.read()
 
         # Set the API endpoint and parameters
-        url = 'https://stt.api.cloud.yandex.net/speech/v1/stt:recognize'
-        params = {
+    url = 'https://stt.api.cloud.yandex.net/speech/v1/stt:recognize'
+    params = {
             'lang': 'ru-RU',
             'format': 'mp3',
             'sampleRateHertz': 44100
         }
 
         # Send the request with API key in headers and audio data in body
-        response = requests.post(url, headers={'Authorization': f'Api-Key {API_KEY}'}, params=params, data=audio_data)
+    response = requests.post(url, headers={'Authorization': f'Api-Key {API_KEY}'}, params=params, data=audio_data)
 
         # Parse the response JSON and extract the transcribed text
-        response_json = json.loads(response.text)
-        text = response_json['result']
+    response_json = json.loads(response.text)
+    text = response_json['result']
 
         # Print the transcribed text
-        print(text)
-        print("going to Translate "+text)
-        transl = step4(text,path)
-        #now elevenlabs
-        step5(transl,path)
-        print("OK")
+    print('yandex text='+text)
+    return text
+    
 
-def step4(text,path):
+def step4_translate(text,path,lang="Arabic",source="Russian")->str:
     # Replace with your OpenAI API key  
     
     openaiapi_key = "your_openai_api_key"
@@ -102,7 +100,7 @@ def step4(text,path):
     text = 'transcribed_text_in_russian'
 
     # Set the translation prompt
-    prompt = (f"Translate the following text from Russian to Arabic:\n"
+    prompt = (f"Translate the following text from {source} to {lang} :\n"
             f"{text}\n"
             f"Translation:")
 
@@ -128,19 +126,44 @@ def step4(text,path):
         print("saved at "+txt)
     return translated_text
 
-def step5(translated,path):
+def step5_generatefromtranslate(translated,path,lang="arabic")->str:
     print("eleven labs")    
     set_api_key("YOUR_ELEVEN_API_KEY")  
   
     audio = generate(translated,model="eleven_multilingual_v2")
-    save(audio,"test.wav")
+    fp = os.path.join(path,lang+".wav")
+    save(audio,fp)
+    return fp
+
+def step6_audiotovideo(newaudio,mp4file,lang="arabic"):
+    print("join audio to video "+newaudio)
+    
+    videoclip = VideoFileClip(mp4file)
+    #audioclip = videoclip.audio
+    audioclip = AudioFileClip(newaudio)
+    new_audioclip = CompositeAudioClip([audioclip])
+    videoclip.audio = new_audioclip
+    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    rand_int = random.randint(0, 9999)        
+    filename = os.path.join(mp4file,f"_vid_{lang}_{now}_{rand_int}.mp4")
+    videoclip.write_videofile(filename)
+    print("vid ok "+filename)
+    videoclip.close()
+    audioclip.close()
+    return filename
 
 def main():
-    print("ULTIMATE CONTENT KITCHEN BY IVAN TOPP")
-    step1()
+    print("ULTIMATE CONTENT KITCHEN BY IVAN TOPP KOROTEEV")
+    step1_searchmp4()
     if (new_files.count>0):
-        step2()
-        step3()
+        for mp4file in new_files:
+            mp3_path = step2_getmp3audio(mp4file)
+            translation_tts = step3_tts(mp3_path)
+            translated_text = step4_translate(translation_tts,mp4file)
+            genaratedaudio = step5_generatefromtranslate(translated_text,mp4file)
+            newvideofile = step6_audiotovideo(genaratedaudio,mp4file)
+            print("RESULT ="+newvideofile)
+
     print("FINISHED")
 
 main()
